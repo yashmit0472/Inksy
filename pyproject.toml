@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=78"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "inksy"
+version = "0.1.0"
+description = "From-scratch conditional handwriting generation"
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "torch==2.13.0",
+  "torchvision==0.28.0",
+  "numpy==2.5.2",
+  "Pillow==12.3.0",
+  "tqdm==4.67.1",
+]
+
+[project.optional-dependencies]
+dev = ["pytest==9.0.2", "ruff==0.14.3"]
+
+[tool.setuptools.packages.find]
+include = ["ml*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = ["training: explicitly opt-in tests that update weights on synthetic fixtures"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+extend-exclude = [".cache", "data", "artifacts", "output"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]

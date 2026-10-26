@@ -1,0 +1,19 @@
+{
+  "data_root": "data",
+  "prepared_dir": "artifacts/data",
+  "output_dir": "artifacts/baseline",
+  "seed": 42,
+  "batch_size": 256,
+  "epochs": 20,
+  "learning_rate": 0.001,
+  "latent_dim": 32,
+  "label_dim": 16,
+  "base_channels": 32,
+  "beta": 1.0,
+  "kl_warmup_epochs": 5,
+  "patience": 5,
+  "num_workers": 0,
+  "cpu_threads": 4,
+  "balanced_sampling": true,
+  "device": "auto"
+}
