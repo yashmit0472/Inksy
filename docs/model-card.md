@@ -10,9 +10,13 @@ Generate isolated handwritten-style Latin alphanumerics for an educational handw
 
 ## Model
 
+The original `baseline` architecture and its version-1 checkpoints remain supported. The `refined` experiment adds label modulation at 7x7 and 14x14 plus a residual stroke refiner, initialized as identity/zero-output so the source baseline's initial pixels are preserved. The owner completed five refinement epochs. Paired exact-label recognizer agreement increased from 57.94% to 59.48% and common validation loss decreased from 132.4933 to 130.4517; these are modest development diagnostics from an imperfect evaluator, not human accuracy or release-quality certification. New checkpoints use format version 2 and record architecture and initialization provenance. See `docs/refinement-experiment.md` for results and the unrun continued-training control.
+
 Two stride-2 convolution blocks reduce 28x28 grayscale input to 7x7 features. A class embedding joins the encoder features, producing posterior mean/log-variance. A sampled latent vector and the same class embedding feed a decoder with two transposed-convolution blocks. Output logits convert to foreground intensities with sigmoid. All weights start randomly. No pretrained weights or external generation API are involved.
 
 The default model uses 32 base channels, 16 label-embedding dimensions and 32 latent dimensions. The loss is pixel-summed BCE plus beta times dimension-summed KL, both averaged over the batch. KL warmup applies only to training; validation uses fixed full beta and fixed noise.
+
+The refined experiment additionally weights the per-image absolute horizontal/vertical gradient mismatch by 0.5. Its weighted objective is not directly comparable to the baseline objective. `ml.evaluate` reports a fixed common beta-1 BCE-plus-KL loss and unweighted edge error separately for comparison.
 
 ## Data
 

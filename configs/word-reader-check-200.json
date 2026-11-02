@@ -1,0 +1,16 @@
+{
+  "prepared": "artifacts/iam-words",
+  "output": "artifacts/word-reader-check-200",
+  "epochs": 1,
+  "batch_size": 16,
+  "max_train_batches": 200,
+  "max_validation_batches": 16,
+  "learning_rate": 0.001,
+  "channels": 24,
+  "hidden": 128,
+  "layers": 2,
+  "seed": 314,
+  "cpu_threads": 4,
+  "device": "cpu",
+  "progress": true
+}

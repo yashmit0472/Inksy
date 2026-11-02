@@ -1,0 +1,9 @@
+{
+  "height": 64,
+  "margin": 4,
+  "max_width": 384,
+  "max_characters": 24,
+  "seed": 42,
+  "content_validation_fraction": 0.1,
+  "seen_validation_fraction": 0.1
+}

@@ -12,7 +12,7 @@ from ml.characters import ALPHABET
 from ml.checkpoint import load_checkpoint
 from ml.dataset import load_emnist, load_partitions
 from ml.generate import sample_glyphs
-from ml.model import vae_loss
+from ml.model import ConditionalVAE, vae_loss
 from ml.utils import resolve_device, seed_everything, sha256_file, write_json
 from ml.visualize import save_grid
 
@@ -42,6 +42,8 @@ def evaluate(
     torch.set_num_threads(4)
     device = resolve_device(device)
     model, metadata = load_checkpoint(checkpoint, device)
+    if not isinstance(model, ConditionalVAE):
+        raise ValueError("VAE reconstruction metrics do not apply to cGANs. Use ml.compare_gan.")
     _, _, validation, manifest = load_partitions(root, prepared)
     if metadata["split_sha256"] != manifest["split_sha256"]:
         raise ValueError("Checkpoint and evaluation data use different splits.")
@@ -49,10 +51,12 @@ def evaluate(
     loader = DataLoader(
         dataset, batch_size=256, shuffle=False, generator=torch.Generator().manual_seed(43)
     )
-    sums = torch.zeros((len(ALPHABET), 3), dtype=torch.float64)
+    sums = torch.zeros((len(ALPHABET), 4), dtype=torch.float64)
     counts = torch.zeros(len(ALPHABET), dtype=torch.long)
     generator = torch.Generator(device=device).manual_seed(43)
-    beta = metadata["training_config"]["beta"]
+    # Fixed common objective permits comparisons when the candidate adds an auxiliary loss.
+    beta = 1.0
+    metric_names = ("loss", "reconstruction", "kl", "edge")
     for batch_index, (images, labels) in enumerate(loader):
         if max_batches is not None and batch_index >= max_batches:
             break
@@ -63,10 +67,7 @@ def evaluate(
             mask = labels == label
             losses = vae_loss(logits[mask], images[mask], mu[mask], logvar[mask], beta)
             index, count = int(label), int(mask.sum())
-            sums[index] += (
-                torch.tensor([losses[key].item() for key in ("loss", "reconstruction", "kl")])
-                * count
-            )
+            sums[index] += torch.tensor([losses[key].item() for key in metric_names]) * count
             counts[index] += count
     output.mkdir(parents=True, exist_ok=True)
     total = int(counts.sum())
@@ -79,9 +80,12 @@ def evaluate(
         "examples": total,
         "partial": max_batches is not None,
         "beta": beta,
-        "metrics": dict(
-            zip(("loss", "reconstruction", "kl"), (sums.sum(0) / total).tolist(), strict=True)
-        ),
+        "metrics": dict(zip(metric_names, (sums.sum(0) / total).tolist(), strict=True)),
+        "common_objective": {"beta": beta, "edge_weight": 0.0},
+        "checkpoint_training_objective": {
+            "beta": metadata["training_config"]["beta"],
+            "edge_weight": metadata["training_config"].get("edge_weight", 0.0),
+        },
         "per_class": {
             char: {
                 "count": int(counts[i]),

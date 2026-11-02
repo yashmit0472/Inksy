@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader, WeightedRandomSampler
 from tqdm import tqdm
 
 from ml.characters import ALPHABET
-from ml.checkpoint import save_checkpoint
+from ml.checkpoint import initialize_from_checkpoint, save_checkpoint
 from ml.dataset import load_partitions
 from ml.model import ConditionalVAE, ModelConfig, vae_loss
 from ml.utils import environment_info, resolve_device, seed_everything, sha256_file, write_json
@@ -43,6 +43,9 @@ class TrainingConfig:
     max_train_batches: int | None = None
     max_validation_batches: int | None = None
     progress: bool = True
+    architecture: str = "baseline"
+    edge_weight: float = 0.0
+    init_checkpoint: str | None = None
 
     def __post_init__(self):
         for key in (
@@ -61,8 +64,14 @@ class TrainingConfig:
             or self.beta < 0
             or self.num_workers < 0
             or self.kl_warmup_epochs < 0
+            or self.edge_weight < 0
+            or not all(
+                math.isfinite(value) for value in (self.learning_rate, self.beta, self.edge_weight)
+            )
         ):
             raise ValueError("Invalid training hyperparameters.")
+        if self.architecture not in {"baseline", "refined"}:
+            raise ValueError("Architecture must be baseline or refined.")
         for value in (self.max_train_batches, self.max_validation_batches):
             if value is not None and value < 1:
                 raise ValueError("Batch limits must be positive.")
@@ -79,10 +88,11 @@ def run_epoch(
     seed=43,
     show_progress=True,
     description=None,
+    edge_weight=0.0,
 ):
     training = optimizer is not None
     model.train(training)
-    totals = {key: 0.0 for key in ("loss", "reconstruction", "kl")}
+    totals = {key: 0.0 for key in ("loss", "base_loss", "reconstruction", "kl", "edge")}
     examples = 0
     # Validation uses fixed noise each epoch, independently of the global training RNG.
     generator = torch.Generator(device=device).manual_seed(seed)
@@ -109,7 +119,7 @@ def run_epoch(
             else:
                 mu, logvar = model.encode(images, labels)
                 logits = model.decode(model.reparameterize(mu, logvar, generator), labels)
-            losses = vae_loss(logits, images, mu, logvar, beta)
+            losses = vae_loss(logits, images, mu, logvar, beta, edge_weight)
             if not all(torch.isfinite(value).item() for value in losses.values()):
                 raise FloatingPointError("Non-finite loss. Inspect data/model before continuing.")
             if training:
@@ -210,8 +220,23 @@ def train(config: TrainingConfig):
         generator=torch.Generator().manual_seed(config.seed + 1),
     )
     model = ConditionalVAE(
-        ModelConfig(config.latent_dim, config.label_dim, config.base_channels)
-    ).to(device)
+        ModelConfig(
+            config.latent_dim,
+            config.label_dim,
+            config.base_channels,
+            architecture=config.architecture,
+        )
+    )
+    initialization = None
+    if config.init_checkpoint:
+        initialization = initialize_from_checkpoint(
+            model, Path(config.init_checkpoint), manifest["split_sha256"]
+        )
+        write_json(output / "initialization.json", initialization)
+        print(f"Initialized from {config.init_checkpoint}; optimizer starts fresh.", flush=True)
+    model = model.to(device)
+    # Make initialization's RNG consumption independent of the training noise sequence.
+    seed_everything(config.seed)
     optimizer = torch.optim.Adam(model.parameters(), lr=config.learning_rate)
     print(f"Parameters: {sum(p.numel() for p in model.parameters()):,}", flush=True)
     best, stale, history = math.inf, 0, []
@@ -227,6 +252,7 @@ def train(config: TrainingConfig):
             max_batches=config.max_train_batches,
             show_progress=config.progress,
             description=f"Train {epoch}/{config.epochs}",
+            edge_weight=config.edge_weight,
         )
         # Always compare validation at the final beta, including during KL warmup.
         val_metrics = run_epoch(
@@ -238,6 +264,7 @@ def train(config: TrainingConfig):
             seed=config.seed + 1,
             show_progress=config.progress,
             description=f"Validation {epoch}/{config.epochs}",
+            edge_weight=config.edge_weight,
         )
         row = {
             "epoch": epoch,
@@ -261,6 +288,7 @@ def train(config: TrainingConfig):
             "split_sha256": manifest["split_sha256"],
             "validation": val_metrics,
             "quality_status": "pipeline-smoke-only" if smoke else "unreviewed-research-checkpoint",
+            "initialization": initialization,
         }
         print("Saving checkpoints and sample grids...", flush=True)
         save_checkpoint(output / "last.pt", model, **metadata)
@@ -279,6 +307,8 @@ def train(config: TrainingConfig):
             "best_validation_loss": best,
             "epochs_completed": len(history),
             "quality_status": metadata["quality_status"],
+            "objective": {"beta": config.beta, "edge_weight": config.edge_weight},
+            "initialization": initialization,
             "best_checkpoint_sha256": sha256_file(output / "best.pt"),
             "test_set_evaluated": False,
             "warning": (
@@ -299,13 +329,22 @@ def main():
     parser.add_argument("--max-train-batches", type=int)
     parser.add_argument("--max-validation-batches", type=int)
     parser.add_argument(
+        "--init-checkpoint", type=str, help="Initialize from our compatible checkpoint."
+    )
+    parser.add_argument(
         "--no-progress",
         action="store_true",
         help="Hide live bars; keep epoch summaries for log files.",
     )
     args = parser.parse_args()
     values = json.loads(args.config.read_text(encoding="utf-8"))
-    for key in ("device", "epochs", "max_train_batches", "max_validation_batches"):
+    for key in (
+        "device",
+        "epochs",
+        "max_train_batches",
+        "max_validation_batches",
+        "init_checkpoint",
+    ):
         if getattr(args, key) is not None:
             values[key] = getattr(args, key)
     if args.output:

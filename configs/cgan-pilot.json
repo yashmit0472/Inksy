@@ -1,0 +1,18 @@
+{
+  "output_dir": "artifacts/cgan-pilot",
+  "epochs": 3,
+  "max_train_batches": 500,
+  "batch_size": 128,
+  "latent_dim": 32,
+  "label_dim": 32,
+  "base_channels": 32,
+  "generator_lr": 0.0002,
+  "discriminator_lr": 0.0002,
+  "adam_beta1": 0.0,
+  "adam_beta2": 0.9,
+  "seed": 42,
+  "cpu_threads": 4,
+  "num_workers": 0,
+  "device": "cpu",
+  "progress": true
+}

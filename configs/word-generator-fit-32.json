@@ -1,0 +1,13 @@
+{
+  "prepared": "artifacts/iam-words",
+  "output": "artifacts/word-generator-fit-32",
+  "writer_id": "000",
+  "records_sha256": "1a4ad15ed16d2991ba04d5d77291b5191274a4882699b461e1f0d80177f5c01c",
+  "seed": 42,
+  "max_updates": 1000,
+  "max_seconds": 1200,
+  "batch_size": 8,
+  "check_every": 100,
+  "learning_rate": 0.001,
+  "cpu_threads": 4
+}

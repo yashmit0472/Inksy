@@ -1,0 +1,22 @@
+{
+  "prepared": "artifacts/iam-words",
+  "output": "artifacts/word-reader-balanced",
+  "epochs": 10,
+  "batch_size": 16,
+  "max_train_batches": 500,
+  "max_validation_batches": null,
+  "learning_rate": 0.0005,
+  "channels": 24,
+  "hidden": 128,
+  "layers": 2,
+  "architecture": "spatial",
+  "sampling": "coverage",
+  "seed": 317,
+  "cpu_threads": 4,
+  "device": "cpu",
+  "progress": true,
+  "init_checkpoint": "artifacts/word-reader-spatial-continue-2/best.pt",
+  "early_stopping_patience": 3,
+  "early_stopping_min_delta": 0.005,
+  "balance_word_frequency": true
+}

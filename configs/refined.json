@@ -1,0 +1,23 @@
+{
+  "data_root": "data",
+  "prepared_dir": "artifacts/data",
+  "output_dir": "artifacts/refined-5",
+  "init_checkpoint": "artifacts/baseline-10/best.pt",
+  "architecture": "refined",
+  "edge_weight": 0.5,
+  "seed": 42,
+  "batch_size": 256,
+  "epochs": 5,
+  "learning_rate": 0.0002,
+  "latent_dim": 32,
+  "label_dim": 16,
+  "base_channels": 32,
+  "beta": 1.0,
+  "kl_warmup_epochs": 0,
+  "patience": 3,
+  "num_workers": 0,
+  "cpu_threads": 4,
+  "balanced_sampling": true,
+  "device": "cpu",
+  "progress": true
+}

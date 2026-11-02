@@ -4,6 +4,10 @@ A handwriting-generation project built around a **conditional convolutional VAE 
 
 ## Current milestone
 
+**2 November 2026:** The new from-scratch word generator completed its first 1,000-update, 32-word fit. Image fitting improved, but smeared/missing strokes failed the visual gate; unseen-word quality remains unestablished. Read [the result review](docs/word-generator-fit-review.md) before further training. The [fit guide](docs/word-generator-fit.md) records the original command and review workflow. Older glyph-model steps below remain historical setup/reference instructions.
+
+Next experiment: [a matched decoder-detail comparison](docs/word-generator-detail-comparison.md) is prepared with a plain control and position-aware candidate initialized from the same checkpoint. Owner execution is pending; no improvement is claimed from its non-training checks.
+
 The offline ML foundation is implemented: EMNIST ByClass preparation, deterministic train/validation splits, image/label sanity grids, conditional VAE, training/checkpoints, seeded glyph sampling, validation diagnostics and tests. No usable-handwriting claim is made until the generated samples pass the documented review. The compositor, API and frontend follow the model feasibility gate.
 
 The revised blueprint is in `output/pdf/Inksy_End_to_End_Project_Plan_v1.1.pdf`.
@@ -79,6 +83,48 @@ Data loading and checkpoint/sample saving also announce their stages. The bars m
 Sampling uses only the trained decoder, requested labels and a local seeded generator. Same seed/model/runtime/settings reproduce pixels; CPU and CUDA results need not be identical. Checkpoint loading checks the alphabet, preprocessing and schema, and uses PyTorch's weights-only loader. Load only trusted project artifacts.
 
 Evaluation defaults to validation data. It reports reconstruction diagnostics by class and exports sample sheets plus a human-review CSV. **Class accuracy remains unreported until genuine human or independently validated classifier evaluation exists.** Opening the official final test data requires `--partition test --final-test` after model selection is frozen.
+
+### Measure generator identity and softness separately
+
+Inference-only diagnostics compare 20 generated glyphs/class with 20 real held-out examples/class. Soft-pixel fraction and edge energy describe the images; neither is a recognition accuracy or universal perceptual-quality score:
+
+```powershell
+.\.venv\Scripts\python.exe -m ml.quality --checkpoint artifacts/baseline-10/best.pt --output artifacts/quality-baseline-10
+```
+
+For automated requested-character scoring, the owner must first manually train a **separate recognizer from scratch**, using real training images only:
+
+```powershell
+.\.venv\Scripts\python.exe -m ml.train_recognizer --output artifacts/recognizer --device cpu --epochs 3
+```
+
+This changes only the evaluator's weights, not the generator's weights. It has training/validation progress bars. The real validation partition is split deterministically into disjoint classifier-selection and real-audit halves. The best epoch is selected on the selection half; the real audit is opened once afterward. Official test examples remain unused. Do not repeatedly tune this evaluator on its audit results; reserve a new audit if it is redesigned.
+
+Once that manual run finishes, score 100 prior-generated images/class (6,200 total) with inference only:
+
+```powershell
+.\.venv\Scripts\python.exe -m ml.score_generation --checkpoint artifacts/baseline-10/best.pt --recognizer artifacts/recognizer/best.pt --output artifacts/agreement-baseline-10
+```
+
+The report separates exact-label and case-insensitive agreement, real-audit accuracy, per-class errors and major confusions. Classes with weak real-audit accuracy are explicitly flagged. A smoke/unaudited recognizer cannot be used for scoring. Agreement is an imperfect classifier proxy; human readability, case ambiguity, sharpness and page quality still need review. Confidence values are not calibrated.
+
+The original review sheets and blank annotation CSV are in `artifacts/evaluation-baseline-10/`. Analysis and current limitations are in `docs/quality-review.md`.
+
+### Improved generator experiment
+
+The refined architecture adds label modulation inside the decoder and a learned residual stroke refiner, with an optional gradient-preservation loss. It initializes from our own ten-epoch checkpoint. The owner can manually run five additional epochs with:
+
+```powershell
+.\.venv\Scripts\python.exe -m ml.train --config configs/refined.json
+```
+
+After training, the paired inference-only comparison is:
+
+```powershell
+.\.venv\Scripts\python.exe -m ml.compare_generators --candidate artifacts/refined-5/best.pt
+```
+
+The owner completed this experiment. Paired diagnostics show a modest gain: exact-label agreement 57.94% to 59.48%, ignoring-case agreement 76.15% to 77.26%, and common validation loss 132.4933 to 130.4517. The checker is imperfect and visual quality remains below the release bar. See `docs/refinement-experiment.md` for the full comparison, initialization, an unrun continued-training control, common loss definitions and limitations. Source checkpoints remain separate from the new run. The recognizer is kept out of the generator's training objective.
 
 ## Checks
 

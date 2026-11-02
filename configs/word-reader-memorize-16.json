@@ -1,0 +1,11 @@
+{
+  "prepared": "artifacts/iam-words",
+  "checkpoint": "artifacts/word-reader-check-200/best.pt",
+  "output": "artifacts/word-reader-memorize-16",
+  "max_updates": 600,
+  "check_every": 25,
+  "consecutive_passes": 3,
+  "learning_rate": 0.001,
+  "seed": 314,
+  "cpu_threads": 4
+}

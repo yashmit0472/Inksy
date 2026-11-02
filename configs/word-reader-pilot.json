@@ -1,0 +1,16 @@
+{
+  "prepared": "artifacts/iam-words",
+  "output": "artifacts/word-reader-pilot",
+  "epochs": 5,
+  "batch_size": 16,
+  "max_train_batches": 500,
+  "max_validation_batches": 32,
+  "learning_rate": 0.001,
+  "channels": 24,
+  "hidden": 128,
+  "layers": 2,
+  "seed": 314,
+  "cpu_threads": 4,
+  "device": "cpu",
+  "progress": true
+}

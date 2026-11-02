@@ -1,0 +1,16 @@
+{
+  "prepared": "artifacts/iam-words",
+  "output": "artifacts/word-generator-detail-control",
+  "writer_id": "000",
+  "records_sha256": "1a4ad15ed16d2991ba04d5d77291b5191274a4882699b461e1f0d80177f5c01c",
+  "seed": 42,
+  "max_updates": 1000,
+  "max_seconds": 1200,
+  "batch_size": 8,
+  "check_every": 100,
+  "learning_rate": 0.001,
+  "cpu_threads": 4,
+  "architecture": "plain",
+  "init_checkpoint": "artifacts/word-generator-fit-32/best.pt",
+  "init_sha256": "2b5e0b17e5ea7a79c2a6e8e19e225fd0e8943ad3785a413c3f3f12aa7852a558"
+}
