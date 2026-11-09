@@ -4,15 +4,27 @@ A handwriting-generation project built around a **conditional convolutional VAE 
 
 ## Current milestone
 
+The local handwriting studio turns pasted text into previewable pages and PNG downloads. It uses the trained mixed-case checkpoint at `artifacts/print-handwriting-v3-balanced/model.pt`.
+
+```powershell
+.\.venv\Scripts\python.exe -m rendering.studio
+```
+
+Open `http://127.0.0.1:8765`. The studio accepts English letters, digits and the current punctuation set. The preview and PNG download share the same image bytes.
+
+See [Deploy Inksy on Render](docs/deployment.md) to host the public demo.
+
 **2 November 2026:** The new from-scratch word generator completed its first 1,000-update, 32-word fit. Image fitting improved, but smeared/missing strokes failed the visual gate; unseen-word quality remains unestablished. Read [the result review](docs/word-generator-fit-review.md) before further training. The [fit guide](docs/word-generator-fit.md) records the original command and review workflow. Older glyph-model steps below remain historical setup/reference instructions.
 
-Next experiment: [a matched decoder-detail comparison](docs/word-generator-detail-comparison.md) is prepared with a plain control and position-aware candidate initialized from the same checkpoint. Owner execution is pending; no improvement is claimed from its non-training checks.
+**5 November update:** Both arms of the matched decoder-detail comparison completed. The position-aware candidate improves training-word image fitting and removes several visible smears, but human fit acceptance and reliable new-word generation remain unestablished. See [the comparison results](docs/word-generator-detail-review.md) before any additional training.
+
+The [offline readability review](docs/word-generator-human-review.md) records the earlier 32-word experiment.
 
 The offline ML foundation is implemented: EMNIST ByClass preparation, deterministic train/validation splits, image/label sanity grids, conditional VAE, training/checkpoints, seeded glyph sampling, validation diagnostics and tests. No usable-handwriting claim is made until the generated samples pass the documented review. The compositor, API and frontend follow the model feasibility gate.
 
 The revised blueprint is in `output/pdf/Inksy_End_to_End_Project_Plan_v1.1.pdf`.
 
-**Training is manual.** The project owner will launch all model-training runs. The commands below are instructions for the owner; setup, data preparation and the default test suite do not train a model. Tests that update weights are skipped unless the owner explicitly supplies `--run-training`.
+The agent runs model training as part of requested work. The default test suite skips tests that update weights. Use `--run-training` to include them explicitly.
 
 See `docs/status.md` for verified local results and the next manual training command. The exact tested CPU dependency set is in `requirements-lock.txt`; install it with `python -m pip install -r requirements-lock.txt`, then install this project with `python -m pip install -e . --no-deps`.
 
@@ -158,5 +170,3 @@ EMNIST derives from NIST Special Database 19. Record the original terms and attr
 Cohen, G., Afshar, S., Tapson, J., and van Schaik, A. (2017), *EMNIST: an extension of MNIST to handwritten letters*: https://arxiv.org/abs/1702.05373
 
 PyTorch installation versions: https://pytorch.org/get-started/previous-versions/
-#   I n k s y  
- 

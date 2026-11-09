@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Train my handwriting style | Inksy</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/studio.css">
+  <script src="/train.js" defer></script>
+</head>
+<body>
+  <header class="masthead">
+    <a class="brand" href="/">Inksy</a>
+    <a class="text-button" href="/">Back to studio</a>
+  </header>
+  <main>
+    <div class="intro">
+      <p class="eyebrow">HANDWRITING WORKSHEET</p>
+      <h1>Train my style</h1>
+      <p>Write each lowercase letter, capital, and digit twice. Upload a photo of the paper worksheet or draw in the boxes below.</p>
+    </div>
+    <form id="worksheet-form">
+      <label for="style-name">Style name</label>
+      <input id="style-name" class="field style-name" maxlength="40" placeholder="My handwriting" required>
+      <section class="photo-panel" aria-labelledby="photo-title">
+        <h2 id="photo-title">Import a paper worksheet</h2>
+        <p><a class="text-button" href="/worksheet" target="_blank" rel="noopener">Open printable worksheet</a>. Use a dark pen and photograph the whole page in even light. Keep all four black squares visible.</p>
+        <label for="worksheet-photo">Choose a worksheet photo</label>
+        <input id="worksheet-photo" type="file" accept="image/jpeg,image/png">
+        <p id="photo-status" role="status"></p>
+        <div class="photo-preview" id="photo-preview" hidden>
+          <canvas id="photo-canvas" aria-label="Worksheet photo. Select the four marker centers in the order shown."></canvas>
+          <div class="photo-actions">
+            <button id="reset-markers" class="text-button" type="button">Reset markers</button>
+            <button id="import-photo" class="secondary" type="button" disabled>Fill empty boxes from photo</button>
+          </div>
+        </div>
+      </section>
+      <h2>Review your samples</h2>
+      <p>Check that each drawing matches its label. Clear a wrong sample, then draw it again or fill it from another photo.</p>
+      <div id="worksheet" class="worksheet"></div>
+      <div class="worksheet-bar">
+        <div>
+          <p id="worksheet-count">0 / 124 samples</p>
+          <p id="training-status" role="status">Your draft stays in this browser.</p>
+          <progress id="training-progress" hidden></progress>
+          <p id="training-error" class="error" role="alert" hidden></p>
+        </div>
+        <button id="train" class="primary" type="submit" disabled>Train my style</button>
+        <a id="open-style" class="secondary" hidden>Try this style</a>
+      </div>
+    </form>
+  </main>
+</body>
+</html>

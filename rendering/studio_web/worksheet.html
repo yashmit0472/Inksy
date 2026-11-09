@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Printable handwriting worksheet | Inksy</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <style>
+    body { margin: 16px; text-align: center; font: 16px system-ui, sans-serif; }
+    img { display: block; margin: auto; width: min(100%, 820px); }
+    @page { size: A4 portrait; margin: 8mm; }
+    @media print {
+      body { margin: 0; }
+      p { display: none; }
+      img { height: 277mm; width: auto; max-width: 100%; object-fit: contain; }
+    }
+  </style>
+</head>
+<body>
+  <p>Print this page in portrait orientation. Keep all four black markers on the same sheet.
+    <a href="/worksheet.png" download="inksy-worksheet.png">Download worksheet image</a></p>
+  <img src="/worksheet.png" alt="Inksy worksheet with two labeled boxes for every letter and digit">
+</body>
+</html>

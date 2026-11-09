@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: inksy-handwriting
+    runtime: python
+    plan: free
+    autoDeployTrigger: "off"
+    healthCheckPath: /api/status
+    buildCommand: python -m pip install --index-url https://download.pytorch.org/whl/cpu torch==2.13.0 torchvision==0.28.0 && python -m pip install .
+    startCommand: python -m deploy.render_start
+    envVars:
+      - key: INKSY_CHECKPOINT_SHA256
+        value: 37e587c5aacea7f188d56ba48ecc22be2738dfb56c5a25517081dedf43e29801

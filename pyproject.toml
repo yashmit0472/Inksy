@@ -22,6 +22,10 @@ dev = ["pytest==9.0.2", "ruff==0.14.3"]
 [tool.setuptools.packages.find]
 include = ["ml*", "rendering*"]
 
+[tool.setuptools.package-data]
+ml = ["word_review_page.html"]
+rendering = ["studio_web/*.html", "studio_web/*.css", "studio_web/*.js", "studio_web/*.svg"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"

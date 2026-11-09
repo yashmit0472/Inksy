@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Turn typed text into downloadable handwritten pages.">
+  <title>Inksy Handwriting Studio</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/studio.css">
+  <script src="/studio.js" defer></script>
+</head>
+<body>
+  <header class="masthead">
+    <a class="brand" href="/" aria-label="Inksy home">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><path d="M7 23c4-8 11-14 18-17-1 9-5 16-13 18M5 27l12-13M12 24h11"/></svg>
+      <span>Inksy</span>
+    </a>
+    <span class="local"><span></span> <span id="studio-location">On this device</span></span>
+  </header>
+  <main>
+    <div class="intro">
+      <p class="eyebrow">HANDWRITING STUDIO</p>
+      <h1>Give your words a handwritten feel.</h1>
+      <p>Paste your text, preview the pages, and download them as images.</p>
+    </div>
+    <div class="workspace">
+      <section class="editor" aria-labelledby="editor-title">
+        <form id="editor-form">
+          <div class="section-top">
+            <h2 id="editor-title"><label for="text">Your text</label></h2>
+            <button id="sample" class="text-button" type="button">Try sample</button>
+          </div>
+          <textarea id="text" rows="12" maxlength="6000" spellcheck="false"
+            aria-describedby="character-count input-note" placeholder="Write or paste your text here"></textarea>
+          <div class="input-meta">
+            <span id="character-count">0 / 6,000</span>
+            <span class="key-hint">Ctrl + Enter</span>
+          </div>
+          <p id="input-note" class="note">English letters, numbers, and common punctuation.</p>
+          <div class="section-top style-row">
+            <label for="style">Handwriting style</label>
+            <a id="train-link" class="text-button" href="/train" hidden>Train my style</a>
+          </div>
+          <select id="style" class="field"><option value="standard">Inksy print</option></select>
+          <p id="error" class="error" role="alert" hidden></p>
+          <button id="generate" class="primary" type="submit">Generate handwriting
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg>
+          </button>
+        </form>
+      </section>
+      <section class="preview" aria-labelledby="preview-title">
+        <div class="preview-top">
+          <div>
+            <h2 id="preview-title">Page preview</h2>
+            <p id="render-status" role="status">Ready to generate</p>
+          </div>
+          <button id="download" class="secondary" type="button" disabled>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg>
+            Download PNG
+          </button>
+        </div>
+        <div id="preview-window" class="preview-window" aria-busy="false">
+          <div id="empty-preview" class="empty-preview">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h8l4 4v14H6zM14 3v5h4M9 12h6m-6 4h6"/></svg>
+            <p>Your page will appear here.</p>
+          </div>
+          <img id="page-image" alt="Generated handwritten page" hidden>
+        </div>
+        <nav class="pagination" aria-label="Preview pages">
+          <button id="previous" type="button" aria-label="Previous page" disabled>‹</button>
+          <span id="page-count">Page 0 of 0</span>
+          <button id="next" type="button" aria-label="Next page" disabled>›</button>
+        </nav>
+      </section>
+    </div>
+    <noscript>This studio needs JavaScript to generate and download the preview.</noscript>
+  </main>
+</body>
+</html>
