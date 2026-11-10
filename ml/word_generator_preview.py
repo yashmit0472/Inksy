@@ -21,12 +21,14 @@ def paper_image(pixels):
 
 
 @torch.inference_mode()
-def generate_images(model, texts, widths=None, batch_size=8):
+def generate_images(model, texts, widths=None, batch_size=8, *, writer=None):
     model.eval()
     images = []
     for start in range(0, len(texts), batch_size):
         batch_widths = None if widths is None else widths[start : start + batch_size]
-        result = model(texts[start : start + batch_size], batch_widths)
+        words = texts[start : start + batch_size]
+        options = {"writers": [writer] * len(words)} if writer is not None else {}
+        result = model(words, batch_widths, **options)
         for pixels, width in zip(result["logits"].sigmoid(), result["widths"], strict=True):
             images.append(paper_image(pixels[:, :, : int(width)]))
     return images
@@ -149,12 +151,13 @@ def main():
         "--text", nargs="+", required=True, help="Lowercase words, 2–10 letters each."
     )
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--writer", help="Writer ID for a multi-writer checkpoint.")
     args = parser.parse_args()
     torch.set_num_threads(4)
     if args.output.exists():
         raise FileExistsError("Choose a new preview directory.")
     model, checkpoint = load_generator(args.checkpoint)
-    images = generate_images(model, args.text)
+    images = generate_images(model, args.text, writer=args.writer)
     args.output.mkdir(parents=True)
     for index, image in enumerate(images):
         image.save(args.output / f"word-{index + 1:03d}.png")

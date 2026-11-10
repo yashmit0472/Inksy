@@ -1,5 +1,7 @@
 # Controlled decoder-detail comparison — 2 November 2026
 
+> **Result reviewed 5 November:** Both arms completed 1,000 additional updates. The position-aware candidate improves image fitting and several visibly smeared words, but formal human acceptance remains pending and new-word quality is unestablished. See [the completed review](word-generator-detail-review.md). The commands below describe the completed experiment; do not repeat them against existing outputs.
+
 ## Decision and evidence
 
 Prepare one matched comparison of the existing decoder and a position-aware decoder, both warm-started from the owner's first from-scratch word-generator checkpoint. **Neither arm has been trained by the agent.** Keep the 32-word fit scope and its original readability gate. Do not expand the dataset until the fit gate passes.

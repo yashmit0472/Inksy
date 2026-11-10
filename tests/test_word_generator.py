@@ -28,6 +28,31 @@ def small_model():
     return WordGenerator(WordGeneratorConfig(embedding=8, hidden=8, channels=16))
 
 
+def test_writer_conditioning_with_mixed_word_lengths_and_checkpoint_roundtrip(tmp_path):
+    config = WordGeneratorConfig(
+        embedding=8, hidden=8, channels=16, architecture="coordinate", writers=("150", "153")
+    )
+    model = WordGenerator(config).eval()
+    with torch.inference_mode():
+        first = model(["letter"], torch.tensor([112]), writers=["150"])
+        mixed = model(
+            ["letter", "handwriting"[:10]], torch.tensor([112, 216]), writers=["150", "153"]
+        )
+        other_style = model(["letter"], torch.tensor([112]), writers=["153"])
+    torch.testing.assert_close(
+        first["logits"], mixed["logits"][:1, :, :, :112], atol=1e-6, rtol=1e-5
+    )
+    assert not torch.allclose(first["logits"], other_style["logits"])
+    with pytest.raises(ValueError, match="Unknown writer"):
+        model(["letter"], writers=["000"])
+    path = tmp_path / "writer.pt"
+    save_generator(path, model, {"writers": config.writers, "records_sha256": "a" * 64})
+    restored, _ = load_generator(path)
+    torch.testing.assert_close(
+        first["logits"], restored(["letter"], torch.tensor([112]), writers=["150"])["logits"]
+    )
+
+
 @pytest.mark.parametrize(
     "texts", [[], ["A"], ["Hello"], ["a"], ["two words"], ["word!"], ["éé"], ["abcdefghijk"]]
 )

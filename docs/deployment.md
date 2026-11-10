@@ -17,3 +17,13 @@ $encoded = [Convert]::ToBase64String([IO.File]::ReadAllBytes($model))
 For owner access, set a strong `INKSY_ADMIN_PASSWORD` in Render and open `/train` over HTTPS using the username `inksy`. Uploads, training status, and saved personal styles are available to signed-in users. To keep personal styles across redeploys, attach a persistent disk and set `INKSY_STYLE_DIR` to a directory on it. Persistent disks require a paid service. Use one instance so the current training job and login session stay on the same process.
 
 The standard model uses IAM and EMNIST samples. The [IAM release](https://zenodo.org/records/19003721) describes noncommercial research use and requests attribution. Keep the portfolio deployment noncommercial and confirm the dataset terms before changing the use of the demo.
+
+## Public demo on Vercel
+
+Vercel serves the same public studio and PNG export. The package contains the standard model's precomputed glyph images and a Python function that lays them out with the same renderer as Render. The function does not need PyTorch. Keep the generated package under ignored `artifacts/`. It does not contain model weights, datasets, or personal styles.
+
+```powershell
+.\.venv\Scripts\python.exe -m deploy.prepare_vercel artifacts/vercel-public
+```
+
+Deploy the contents of `artifacts/vercel-public` as the project root. The Vercel configuration serves only `public/` as static files and bundles the glyph images into the render function. Verify `/api/status` and render a sentence with mixed case and digits. Train and save personal styles through the local studio.

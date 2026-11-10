@@ -1,172 +1,35 @@
 # Inksy
 
-A handwriting-generation project built around a **conditional convolutional VAE trained from scratch** in PyTorch. The model generates isolated character images; a later page compositor and web application will turn them into downloadable pages. No pretrained model or external AI generation API is used.
+Inksy turns typed text into handwritten pages you can preview and download as PNGs. The standard style supports lowercase and uppercase English letters, digits, and common punctuation.
 
-## Current milestone
+**[Try Inksy on Vercel](https://inksy-handwriting.vercel.app/)**
 
-The local handwriting studio turns pasted text into previewable pages and PNG downloads. It uses the trained mixed-case checkpoint at `artifacts/print-handwriting-v3-balanced/model.pt`.
+## What you can do
 
-```powershell
-.\.venv\Scripts\python.exe -m rendering.studio
-```
+- Paste text, preview the generated pages, and download each page as a PNG.
+- In the local studio, train a personal style from a photo of a printable worksheet or by drawing in the browser. The worksheet collects two samples for each of 62 letters and digits. Review the samples, watch training progress, and save the style for reuse.
 
-Open `http://127.0.0.1:8765`. The studio accepts English letters, digits and the current punctuation set. The preview and PNG download share the same image bytes.
+## How it works
 
-See [Deploy Inksy on Render](docs/deployment.md) to host the public demo.
+- **PyTorch:** A convolutional decoder trained from scratch learns glyph shapes from reviewed IAM and EMNIST samples. The standard checkpoint contains 144 learned glyph variants across 62 alphanumeric characters.
+- **Python and Pillow:** The compositor chooses variants, applies small baseline shifts, wraps text, and renders pages. It draws punctuation separately from the learned letters and digits.
+- **Browser and API:** The studio uses HTML, CSS, and JavaScript. The local Python server handles photo alignment, crop review, training, and rendering. The public Vercel demo uses a Python serverless function with precomputed glyphs from the trained model, so it can generate PNGs without loading PyTorch on every request.
 
-**2 November 2026:** The new from-scratch word generator completed its first 1,000-update, 32-word fit. Image fitting improved, but smeared/missing strokes failed the visual gate; unseen-word quality remains unestablished. Read [the result review](docs/word-generator-fit-review.md) before further training. The [fit guide](docs/word-generator-fit.md) records the original command and review workflow. Older glyph-model steps below remain historical setup/reference instructions.
+A blind AI transcription review of the standard style matched **240/240 isolated prompts** (200 held-out lowercase words, 20 mixed-case strings, and 20 digit strings), with zero character edits across 1,622 characters. This was a development check by one AI reviewer. Independent human validation is pending. See [model and evaluation notes](docs/print-handwriting.md).
 
-**5 November update:** Both arms of the matched decoder-detail comparison completed. The position-aware candidate improves training-word image fitting and removes several visible smears, but human fit acceptance and reliable new-word generation remain unestablished. See [the comparison results](docs/word-generator-detail-review.md) before any additional training.
+## Run locally
 
-The [offline readability review](docs/word-generator-human-review.md) records the earlier 32-word experiment.
-
-The offline ML foundation is implemented: EMNIST ByClass preparation, deterministic train/validation splits, image/label sanity grids, conditional VAE, training/checkpoints, seeded glyph sampling, validation diagnostics and tests. No usable-handwriting claim is made until the generated samples pass the documented review. The compositor, API and frontend follow the model feasibility gate.
-
-The revised blueprint is in `output/pdf/Inksy_End_to_End_Project_Plan_v1.1.pdf`.
-
-The agent runs model training as part of requested work. The default test suite skips tests that update weights. Use `--run-training` to include them explicitly.
-
-See `docs/status.md` for verified local results and the next manual training command. The exact tested CPU dependency set is in `requirements-lock.txt`; install it with `python -m pip install -r requirements-lock.txt`, then install this project with `python -m pip install -e . --no-deps`.
-
-## Setup (Windows PowerShell)
-
-The existing `.venv` uses Python 3.12. For a fresh machine, install Python 3.11-3.13 first; the globally installed Python 3.8 on this machine is too old. With Python 3.12 registered with the Windows launcher, create an isolated environment:
+Install Python 3.12, then run these commands from the repo root in PowerShell:
 
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\python.exe -m pip install torch==2.13.0 torchvision==0.28.0 --index-url https://download.pytorch.org/whl/cpu
 .\.venv\Scripts\python.exe -m pip install -e ".[dev]"
+.\.venv\Scripts\python.exe -m rendering.studio --checkpoint artifacts/print-handwriting-v3-balanced/model.pt
 ```
 
-The CPU build is the working baseline for this workspace. The CUDA build was attempted, but Windows reported error 1455 (insufficient paging-file memory) while importing its DLLs, before any training. Windows settings were not changed. Run all commands from the repository root. Dependencies stay in the project environment; they do not modify global Python.
+Open [http://127.0.0.1:8765](http://127.0.0.1:8765). The studio needs the standard checkpoint to start. Datasets, checkpoints, and personal styles are kept outside Git. If you only want to try rendering, use the live demo.
 
-The local GTX 1650 has 4 GiB VRAM. If the owner resolves the Windows host-memory/paging requirement and wants to train on it, manually replace the CPU packages with the official CUDA 12.6 builds:
+Run the default tests with `.\.venv\Scripts\python.exe -m pytest`. Tests that update model weights require an explicit `--run-training` opt-in.
 
-```powershell
-.\.venv\Scripts\python.exe -m pip install --force-reinstall --no-deps torch==2.13.0 torchvision==0.28.0 --index-url https://download.pytorch.org/whl/cu126
-.\.venv\Scripts\python.exe -c "import torch; print(torch.cuda.is_available())"
-```
-
-Verify this import succeeds before launching GPU training. Use the CPU index URL with the same replacement command to return to the working CPU environment.
-
-## 1. Prepare and inspect data
-
-```powershell
-.\.venv\Scripts\python.exe -m ml.dataset --download
-```
-
-This downloads the official EMNIST archive (approximately 536 MiB compressed), including other splits supplied in the archive. Only **ByClass training data** is loaded for preparation. Allow several GiB of free disk space for the archive, extracted data and CUDA environment.
-
-Preparation creates `artifacts/data/manifest.json`, checksums, `split.npz`, and `orientation-and-labels.png`. Inspect the grid before training: characters must be upright, the class labels must match, ink must be foreground, and uppercase/lowercase must remain separate. Prepared output is immutable by default; use a new `--output` path for a different split.
-
-The default split uses 90% of official training examples for training and 10% for validation, stratified by class with seed 42. Official test examples are reserved for final evaluation. No dataset or generated user content belongs in Git.
-
-## 2. Run a bounded real-data smoke test
-
-```powershell
-.\.venv\Scripts\python.exe -m ml.train --config configs/baseline.json --output artifacts/smoke --epochs 1 --max-train-batches 8 --max-validation-batches 2
-```
-
-This verifies the training pipeline on real data. It is labelled **pipeline-smoke-only** and is not evidence of readable handwriting. Unit tests use synthetic fixtures solely to verify implementation correctness.
-
-## 3. Train a research baseline
-
-```powershell
-.\.venv\Scripts\python.exe -m ml.train --config configs/baseline.json
-```
-
-The configuration proposes 20 epochs with early stopping, a 32-dimensional latent vector, balanced sampling and KL warmup. Device `auto` uses CUDA when available. Pilot-run timing should determine the final epoch/experiment budget before a long run. Use `--device cpu` for the portable deterministic baseline. Run output must be new or empty to avoid destroying experiments.
-
-Each run records configuration, environment, data identity, per-epoch train/validation losses, fixed-seed prior grids, reconstruction pairs and versioned `best.pt` / `last.pt` checkpoints. Loss uses reconstruction BCE summed over pixels plus weighted KL summed over latent dimensions, both averaged over examples. Validation always uses the final KL weight and fixed sampling noise for comparable checkpoint selection. Checkpoints restore inference weights; interrupted optimizer-state resume is not implemented yet.
-
-### Live training progress
-
-Training and validation display separate progress bars automatically. Each shows the epoch number, completed/total batches, percentage, elapsed time, estimated time remaining, speed, current batch loss (`loss`), running average loss (`avg`), and processed examples. Bounded runs use their actual batch limit (for example, `200/200`), not the size of the full dataset. The training bar advances after each successful optimizer step; the validation bar advances after each inference batch. ETA appears after enough timing data is available and may change during a run.
-
-Data loading and checkpoint/sample saving also announce their stages. The bars measure work completed, not handwriting quality. Add `--no-progress` when redirecting output to a log file; epoch summaries remain available. New bars apply to the next manually launched run; an already-running Python process keeps its previously loaded code.
-
-## 4. Sample and evaluate
-
-```powershell
-.\.venv\Scripts\python.exe -m ml.generate --checkpoint artifacts/baseline/best.pt --characters AaBb09 --variations 8 --output artifacts/generated/glyphs.png
-.\.venv\Scripts\python.exe -m ml.evaluate --checkpoint artifacts/baseline/best.pt --output artifacts/evaluation
-```
-
-Sampling uses only the trained decoder, requested labels and a local seeded generator. Same seed/model/runtime/settings reproduce pixels; CPU and CUDA results need not be identical. Checkpoint loading checks the alphabet, preprocessing and schema, and uses PyTorch's weights-only loader. Load only trusted project artifacts.
-
-Evaluation defaults to validation data. It reports reconstruction diagnostics by class and exports sample sheets plus a human-review CSV. **Class accuracy remains unreported until genuine human or independently validated classifier evaluation exists.** Opening the official final test data requires `--partition test --final-test` after model selection is frozen.
-
-### Measure generator identity and softness separately
-
-Inference-only diagnostics compare 20 generated glyphs/class with 20 real held-out examples/class. Soft-pixel fraction and edge energy describe the images; neither is a recognition accuracy or universal perceptual-quality score:
-
-```powershell
-.\.venv\Scripts\python.exe -m ml.quality --checkpoint artifacts/baseline-10/best.pt --output artifacts/quality-baseline-10
-```
-
-For automated requested-character scoring, the owner must first manually train a **separate recognizer from scratch**, using real training images only:
-
-```powershell
-.\.venv\Scripts\python.exe -m ml.train_recognizer --output artifacts/recognizer --device cpu --epochs 3
-```
-
-This changes only the evaluator's weights, not the generator's weights. It has training/validation progress bars. The real validation partition is split deterministically into disjoint classifier-selection and real-audit halves. The best epoch is selected on the selection half; the real audit is opened once afterward. Official test examples remain unused. Do not repeatedly tune this evaluator on its audit results; reserve a new audit if it is redesigned.
-
-Once that manual run finishes, score 100 prior-generated images/class (6,200 total) with inference only:
-
-```powershell
-.\.venv\Scripts\python.exe -m ml.score_generation --checkpoint artifacts/baseline-10/best.pt --recognizer artifacts/recognizer/best.pt --output artifacts/agreement-baseline-10
-```
-
-The report separates exact-label and case-insensitive agreement, real-audit accuracy, per-class errors and major confusions. Classes with weak real-audit accuracy are explicitly flagged. A smoke/unaudited recognizer cannot be used for scoring. Agreement is an imperfect classifier proxy; human readability, case ambiguity, sharpness and page quality still need review. Confidence values are not calibrated.
-
-The original review sheets and blank annotation CSV are in `artifacts/evaluation-baseline-10/`. Analysis and current limitations are in `docs/quality-review.md`.
-
-### Improved generator experiment
-
-The refined architecture adds label modulation inside the decoder and a learned residual stroke refiner, with an optional gradient-preservation loss. It initializes from our own ten-epoch checkpoint. The owner can manually run five additional epochs with:
-
-```powershell
-.\.venv\Scripts\python.exe -m ml.train --config configs/refined.json
-```
-
-After training, the paired inference-only comparison is:
-
-```powershell
-.\.venv\Scripts\python.exe -m ml.compare_generators --candidate artifacts/refined-5/best.pt
-```
-
-The owner completed this experiment. Paired diagnostics show a modest gain: exact-label agreement 57.94% to 59.48%, ignoring-case agreement 76.15% to 77.26%, and common validation loss 132.4933 to 130.4517. The checker is imperfect and visual quality remains below the release bar. See `docs/refinement-experiment.md` for the full comparison, initialization, an unrun continued-training control, common loss definitions and limitations. Source checkpoints remain separate from the new run. The recognizer is kept out of the generator's training objective.
-
-## Checks
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest --basetemp .cache/pytest
-.\.venv\Scripts\python.exe -m ruff check .
-```
-
-The default tests cover orientation, character identity, normalization, split integrity, tensor shapes, loss scaling, gradient connectivity, checkpoint compatibility and RNG isolation. They do not update model weights. Tests of the optimizer/training loop and fixed-batch learning require a separate, explicit manual invocation:
-
-```powershell
-.\.venv\Scripts\python.exe -m pytest --run-training --basetemp .cache/pytest-training
-```
-
-A passing test suite does not establish model quality.
-
-## Product boundaries
-
-- Model alphabet: `0-9`, `A-Z`, `a-z` (62 classes).
-- Punctuation in the planned MVP is procedural and explicitly disclosed. Spaces/newlines are layout; unsupported symbols are rejected, never silently dropped.
-- Smart punctuation normalization is explicit and must be shown before generation.
-- The first release assembles isolated glyphs; it does not promise connected cursive, writer imitation or print-quality fidelity.
-- Accounts, saved history and persistent user content are outside the first release.
-
-See `docs/decisions.md`, `docs/model-card.md` and `docs/acceptance.md` for the baseline and remaining gates.
-
-## Data and references
-
-EMNIST derives from NIST Special Database 19. Record the original terms and attribution requirements before redistribution or publication; a local data download is not a commercial-use clearance. The source manifest records source-file checksums. Original dataset: https://www.nist.gov/itl/products-and-services/emnist-dataset
-
-Cohen, G., Afshar, S., Tapson, J., and van Schaik, A. (2017), *EMNIST: an extension of MNIST to handwritten letters*: https://arxiv.org/abs/1702.05373
-
-PyTorch installation versions: https://pytorch.org/get-started/previous-versions/
+For more detail, see the [project status and training experiments](docs/status.md) or the [deployment guide](docs/deployment.md).

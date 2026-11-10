@@ -59,6 +59,7 @@ class WordGeneratorConfig:
     hidden: int = 64
     channels: int = 64
     architecture: str = "plain"
+    writers: tuple[str, ...] = ()
 
     def __post_init__(self):
         for value in (self.embedding, self.hidden, self.channels):
@@ -66,6 +67,12 @@ class WordGeneratorConfig:
                 raise ValueError("Model dimensions must be integers in [8, 128].")
         if self.architecture not in {"plain", "coordinate"}:
             raise ValueError("Unknown word-generator architecture.")
+        if self.writers and (
+            not isinstance(self.writers, tuple)
+            or len(set(self.writers)) != len(self.writers)
+            or any(not isinstance(writer, str) or not writer for writer in self.writers)
+        ):
+            raise ValueError("Writer IDs must be unique, nonempty strings in a tuple.")
 
 
 class WordGenerator(nn.Module):
@@ -83,8 +90,13 @@ class WordGenerator(nn.Module):
         e, h, c = self.config.embedding, self.config.hidden, self.config.channels
         self.embedding = nn.Embedding(27, e, padding_idx=0)
         self.sequence = nn.GRU(e, h, batch_first=True, bidirectional=True)
-        self.width_head = nn.Sequential(nn.Linear(2 * h + 1, h), nn.SiLU(), nn.Linear(h, 1))
-        self.project = nn.Linear(4 * h + 3, c * 8)
+        if self.config.writers:
+            self.style = nn.Embedding(len(self.config.writers), 16)
+            self.advance = nn.Linear(e + 16, 1)
+            self.project = nn.Linear(2 * h + e + 16 + 5, c * 8)
+        else:
+            self.width_head = nn.Sequential(nn.Linear(2 * h + 1, h), nn.SiLU(), nn.Linear(h, 1))
+            self.project = nn.Linear(4 * h + 3, c * 8)
         sizes = [c, c // 2, c // 4, max(8, c // 8)]
         extra = 18 if self.config.architecture == "coordinate" else 0
         self.blocks = nn.ModuleList(
@@ -98,16 +110,31 @@ class WordGenerator(nn.Module):
         self.output = nn.Conv2d(sizes[-1], 1, 3, padding=1)
         nn.init.constant_(self.output.bias, -2.0)
 
-    def forward(self, texts, widths=None):
+    def forward(self, texts, widths=None, *, writers=None):
         tokens, lengths = encode_texts(texts, self.embedding.weight.device)
+        embedded = self.embedding(tokens)
         packed = pack_padded_sequence(
-            self.embedding(tokens), lengths.cpu(), batch_first=True, enforce_sorted=False
+            embedded, lengths.cpu(), batch_first=True, enforce_sorted=False
         )
         packed, _ = self.sequence(packed)
         sequence, _ = pad_packed_sequence(packed, batch_first=True)
-        global_text = sequence.sum(1) / lengths[:, None]
-        width_input = torch.cat([global_text, lengths[:, None] / 10], dim=1)
-        predicted_widths = 8 + 376 * self.width_head(width_input).squeeze(1).sigmoid()
+        if self.config.writers:
+            if writers is None or len(writers) != len(texts):
+                raise ValueError("Supply one writer ID per word.")
+            try:
+                indices = [self.config.writers.index(writer) for writer in writers]
+            except ValueError as error:
+                raise ValueError("Unknown writer ID for this checkpoint.") from error
+            style = self.style(torch.tensor(indices, device=tokens.device))
+            conditioned = torch.cat([embedded, style[:, None].expand(-1, tokens.shape[1], -1)], -1)
+            advances = (10 + 45 * self.advance(conditioned).squeeze(-1).sigmoid()) * (tokens != 0)
+            predicted_widths = (8 + advances.sum(1)).clamp(max=384)
+        else:
+            if writers is not None:
+                raise ValueError("This checkpoint uses a fixed writer.")
+            global_text = sequence.sum(1) / lengths[:, None]
+            width_input = torch.cat([global_text, lengths[:, None] / 10], dim=1)
+            predicted_widths = 8 + 376 * self.width_head(width_input).squeeze(1).sigmoid()
         if widths is None:
             widths = (predicted_widths.detach() / 8).ceil().long().clamp(1, 48) * 8
         if (
@@ -122,7 +149,16 @@ class WordGenerator(nn.Module):
         low_widths = widths // 8
         steps = torch.arange(int(low_widths.max()), device=tokens.device)
         x = (steps[None, :] + 0.5) / low_widths[:, None]
-        position = (x * lengths[:, None] - 0.5).clamp(min=0)
+        if self.config.writers:
+            # Monotone layout, with padding excluded from the learned character advances.
+            bounds = advances.cumsum(1) / advances.sum(1, keepdim=True)
+            slot = (x[:, :, None] >= bounds[:, None]).sum(-1).minimum((lengths - 1)[:, None])
+            starts = F.pad(bounds[:, :-1], (1, 0))
+            start, end = starts.gather(1, slot), bounds.gather(1, slot)
+            phase = ((x - start) / (end - start).clamp_min(1e-5)).clamp(0, 1)
+            position = (slot + phase - 0.5).clamp(min=0)
+        else:
+            position = (x * lengths[:, None] - 0.5).clamp(min=0)
         position = torch.minimum(position, (lengths - 1)[:, None])
         left = position.floor().long()
         right = torch.minimum(left + 1, (lengths - 1)[:, None])
@@ -131,9 +167,25 @@ class WordGenerator(nn.Module):
         b = sequence.gather(1, right[:, :, None].expand(-1, -1, dimension))
         local = a + (b - a) * (position - left)[:, :, None]
         coordinates = torch.stack([x, torch.sin(math.pi * x), torch.cos(math.pi * x)], -1)
-        features = torch.cat(
-            [local, global_text[:, None].expand(-1, local.shape[1], -1), coordinates], -1
-        )
+        if self.config.writers:
+            char = embedded.gather(1, slot[:, :, None].expand(-1, -1, embedded.shape[-1]))
+            within_char = torch.stack(
+                [torch.sin(2 * math.pi * phase), torch.cos(2 * math.pi * phase)], -1
+            )
+            features = torch.cat(
+                [
+                    local,
+                    char,
+                    style[:, None].expand(-1, local.shape[1], -1),
+                    coordinates,
+                    within_char,
+                ],
+                -1,
+            )
+        else:
+            features = torch.cat(
+                [local, global_text[:, None].expand(-1, local.shape[1], -1), coordinates], -1
+            )
         features = self.project(features).transpose(1, 2)
         features = features.reshape(len(texts), self.config.channels, 8, -1)
         features = features * column_mask(low_widths, 8, features.shape[-1])
@@ -224,8 +276,8 @@ def paired_loss(result, targets, widths):
 
 def save_generator(path, model, provenance):
     checkpoint = {
-        "format": FORMAT,
-        "role": ROLE,
+        "format": "inksy-multi-writer-v1" if model.config.writers else FORMAT,
+        "role": "multi-writer-generator" if model.config.writers else ROLE,
         "alphabet": ALPHABET,
         "preprocessing": WORD_PREPROCESSING,
         "model_config": asdict(model.config),
@@ -239,18 +291,23 @@ def save_generator(path, model, provenance):
 
 def load_generator(path):
     checkpoint = torch.load(path, map_location="cpu", weights_only=True)
+    config = WordGeneratorConfig(**checkpoint["model_config"])
     for key, expected in {
-        "format": FORMAT,
-        "role": ROLE,
+        "format": "inksy-multi-writer-v1" if config.writers else FORMAT,
+        "role": "multi-writer-generator" if config.writers else ROLE,
         "alphabet": ALPHABET,
         "preprocessing": WORD_PREPROCESSING,
     }.items():
         if checkpoint.get(key) != expected:
             raise ValueError(f"Incompatible word-generator checkpoint: {key}")
     provenance = checkpoint.get("provenance", {})
-    if not provenance.get("writer_id") or not provenance.get("records_sha256"):
+    if not provenance.get("records_sha256") or (
+        tuple(provenance.get("writers", ())) != config.writers
+        if config.writers
+        else not provenance.get("writer_id")
+    ):
         raise ValueError("Checkpoint lacks writer/data provenance.")
-    model = WordGenerator(WordGeneratorConfig(**checkpoint["model_config"]))
+    model = WordGenerator(config)
     model.load_state_dict(checkpoint["state_dict"], strict=True)
     if any(not torch.isfinite(value).all() for value in model.state_dict().values()):
         raise ValueError("Checkpoint contains non-finite weights.")

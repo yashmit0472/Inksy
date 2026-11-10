@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Inksy — handwriting readability review</title>
+<style>
+:root {color-scheme: light; font: 17px/1.5 system-ui, sans-serif; color:#152936; background:#edf2f4}
+* {box-sizing:border-box} body {margin:0} main {max-width:760px; margin:32px auto; padding:0 20px 110px}
+h1 {font-size:2rem; line-height:1.15; margin:8px 0 18px} h2 {font-size:1rem; color:#536774}
+.intro {margin-bottom:24px} .intro p {margin:12px 0} .tag {color:#12635e; font-weight:700}
+.card {background:white; border:1px solid #c8d4da; border-radius:14px; padding:22px; margin:20px 0}
+.card.done {border-left:5px solid #167369; padding-left:18px}
+.image {min-height:100px; display:flex; align-items:center; overflow:auto; margin:10px 0 18px}
+.image img {width:auto; height:64px; max-width:none; flex-shrink:0}
+label {display:block; font-weight:600; margin:10px 0 6px}
+input[type=text], select {font:inherit; width:100%; min-height:48px; border:1px solid #8b9da7;
+border-radius:7px; padding:9px 12px; background:white; color:inherit}
+input:disabled {background:#edf2f4} .check {font-weight:400; display:flex; gap:10px; align-items:center}
+input[type=checkbox] {width:20px; height:20px} :focus-visible {outline:3px solid #159c91; outline-offset:3px}
+footer {position:fixed; bottom:0; width:100%; background:#fff; border-top:1px solid #b9cbd2; padding:14px 20px}
+.toolbar {max-width:720px; margin:auto; display:flex; align-items:center; justify-content:space-between; gap:16px}
+button {font:inherit; font-weight:650; border:0; border-radius:8px; padding:12px 20px; cursor:pointer;
+background:#12635e; color:white} button:disabled {background:#ccd6da; color:#52616b; cursor:default}
+progress {width:180px; accent-color:#12635e; display:block; height:8px; margin-top:4px}
+.small {font-size:.87rem; color:#465d69} #status {max-width:720px; margin:5px auto 0; font-size:.85rem}
+@media(max-width:520px) {h1 {font-size:1.65rem} .card {padding:16px} progress {width:120px}
+button {padding:12px} main {padding:0 12px 140px} .toolbar {gap:8px}}
+</style>
+<main>
+<div class="intro">
+<span class="tag">INKSY / READABILITY CHECK</span>
+<h1>Can you read this handwriting?</h1>
+<p>Read each of the 32 images and type the word you see. Judge the strokes too:
+look for missing letters, smearing or clipping. Mark unreadable words honestly.</p>
+<p>The requested words are hidden. Ideally, ask someone who has not seen the labeled examples.
+Do not open the answer key while reviewing.</p>
+<p class="small">This page works offline. Answers stay in this browser until you download them.
+The file contains your answers for later scoring; this page does not mark answers right or wrong.</p>
+</div>
+<div id="cards">__CARDS__</div>
+</main>
+<footer><div class="toolbar"><div><strong id="count">0 / 32 reviewed</strong>
+<progress id="progress" max="32" value="0" aria-label="Review completion"></progress></div>
+<button id="download" disabled>Download completed review</button></div>
+<p id="status" role="status" aria-live="polite">Complete both fields for each sample.</p></footer>
+<script id="review-data" type="application/json">__REVIEW_DATA__</script>
+<script>
+"use strict";
+const review = JSON.parse(document.getElementById("review-data").textContent);
+const cards = Array.from(document.querySelectorAll(".card"));
+const storageKey = "inksy-review-" + review.checkpoint_sha256;
+const download = document.getElementById("download");
+const status = document.getElementById("status");
+function answers() {
+  return cards.map((card, index) => ({
+    ...review.samples[index],
+    transcription: card.querySelector(".unreadable").checked ? "<unreadable>" :
+      card.querySelector(".transcription").value.trim(),
+    no_visual_defects: card.querySelector(".visual").value
+  }));
+}
+function complete(row) {
+  return row.transcription.length > 0 && ["yes", "no"].includes(row.no_visual_defects);
+}
+function update() {
+  const rows = answers();
+  let total = 0;
+  rows.forEach((row, i) => {
+    const done = complete(row);
+    cards[i].classList.toggle("done", done);
+    cards[i].querySelector(".transcription").disabled = cards[i].querySelector(".unreadable").checked;
+    total += Number(done);
+  });
+  document.getElementById("count").textContent = `${total} / 32 reviewed`;
+  document.getElementById("progress").value = total;
+  download.disabled = total !== 32;
+  try { localStorage.setItem(storageKey, JSON.stringify(rows)); }
+  catch { status.textContent = "Keep this tab open until you download: browser draft storage is unavailable."; }
+}
+try {
+  const saved = JSON.parse(localStorage.getItem(storageKey) || "null");
+  if (Array.isArray(saved) && saved.length === 32 && saved.every((row, i) =>
+      row && row.sample_id === review.samples[i].sample_id &&
+      row.image_sha256 === review.samples[i].image_sha256 && typeof row.transcription === "string")) {
+    cards.forEach((card, i) => {
+      const unreadable = saved[i].transcription === "<unreadable>";
+      card.querySelector(".unreadable").checked = unreadable;
+      card.querySelector(".transcription").value = unreadable ? "" : saved[i].transcription;
+      card.querySelector(".visual").value = ["yes", "no"].includes(saved[i].no_visual_defects) ?
+        saved[i].no_visual_defects : "";
+    });
+    status.textContent = "Restored your draft answers in this browser.";
+  }
+} catch { /* A draft is optional; a damaged/unavailable draft never fills answers. */ }
+cards.forEach(card => {
+  card.addEventListener("input", update);
+  card.addEventListener("change", update);
+});
+download.addEventListener("click", () => {
+  const rows = answers();
+  if (rows.length !== 32 || !rows.every(complete)) return;
+  const payload = {format:"inksy-blind-word-review-v1", checkpoint_sha256:review.checkpoint_sha256,
+    answers:rows};
+  const blob = new Blob([JSON.stringify(payload, null, 2) + "\n"], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "inksy-word-review-" + review.checkpoint_sha256.slice(0,12) + ".json";
+  document.body.appendChild(link);
+  link.click(); link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  status.textContent = "Review download requested. Keep the file and tell us when it is saved.";
+});
+update();
+</script>
+</html>

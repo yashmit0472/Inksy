@@ -1,4 +1,38 @@
-# Implementation status - 2 November 2026
+# Implementation status - 8 November 2026
+
+## Mixed-case print handwriting trained
+
+The print renderer now supports English capitals, lowercase, digits and 11 drawn punctuation marks. The final checkpoint learned 144 forms from reviewed IAM and EMNIST training crops. Its second 2,100-update fit reduced the heavier digit strokes. The final visual check read all 47 added characters in category-specific unlabeled grids. The mixed paragraph was rendered with all digits and marks and reproduced from its seed. The previous lowercase sample matched pixel for pixel when replayed with v2. See [mixed model and review evidence](print-handwriting.md).
+
+## Readable lowercase print model trained
+
+The owner authorized training for this iteration. The new print renderer learns 26 lowercase letters from visually reviewed IAM training crops and composes them in text order. Its first-pass agent review read 64 of 65 development words correctly. The remaining word, `his`, is visible in the individual PNG. The recorded first-pass score stands. Human acceptance remains pending. Scope is lowercase print with one learned shape per letter. See [usage and evidence](print-handwriting.md).
+
+The six-writer whole-word generator also trained from scratch. It reached 2,178 updates at the time cap. The validation objective went from 1.25288 to 0.98593, yet its 65 unseen-word images still show heavily blurred strokes. The print renderer is the usable path for this iteration. Both runs have pinned data and checkpoint provenance. Lint passed and the default suite recorded 212 passed and four opt-in training tests skipped.
+
+## Clearer real targets inspected; generalization experiment redesigned
+
+Inspected deterministic training references from 12 well-represented writers, then 32-example sheets for writers 150 and 153. Prefer writer 150 for clear print-like output, with 153 as a cursive alternative. This is qualitative target selection, not generated improvement. Prepared a six-writer index with 2,337 training images / 562 distinct words, 246 seen-validation images and 265 content-validation images / 65 globally training-unseen words. Original splits and labels remain intact; reserved pixels remain unopened.
+
+The revised design adds explicit writer conditioning and shared training, selects using seen validation, and evaluates all 65 unseen words in the target style with predicted widths. The broader model/trainer is not implemented and no training command is ready. No training was launched. See [the target audit and revised experiment](clear-target-experiment.md).
+
+## Owner rejects current visual quality; broader training remains deferred
+
+The owner reports that the current words are still not good enough. Treat this as qualitative rejection of visual readiness, without inventing individual transcriptions, exact-word accuracy or a completed blinded study. Completing the review form is not necessary merely to establish that the owner finds the output unacceptable. Do not mark the fit gate passed or automatically expand/continue training.
+
+The position-aware model improves reproduction of the selected training samples, but attractive readable handwriting and generation of new words remain unmet goals. Before another training prescription, assess whether the selected writer's real targets meet the desired visual standard and whether the model can compose unseen text. The current writer was selected by data volume, not legibility; matching that writer more faithfully does not establish the desired product quality. Preserve existing checkpoints and review evidence.
+
+## Offline human review page ready; responses pending
+
+Created a portable blind-review form for the position-aware candidate's 32 saved training-word images. It hides requested text, accepts transcriptions and visual judgments, tracks completion, restores local drafts when available, and downloads a checkpoint/image-bound JSON file. The scorer now accepts that download through `--answers`, while preserving the CSV workflow. All 32 real image digests passed; no actual human answers have been generated or scored.
+
+Verification: 211 tests passed, four weight-update tests skipped, lint passed. Form state/export behavior was checked in a Node DOM harness, not a live browser render test. The candidate's readability gate remains pending; no additional training was launched. See [the short review guide](word-generator-human-review.md).
+
+## Both decoder runs completed; candidate improves fitting, human gate pending
+
+The owner completed 1,000 extra updates in each matched arm: plain control 9m 01s, position-aware candidate 5m 17s. Code/data/initialization checks passed. Inference-only replay reproduced all 64 best-checkpoint word images exactly and reproduced selected/final metrics for both models, with weights unchanged. At the matched final update the candidate's training objective is 2.98% lower and its edge error 12.70% lower; these are image-fit metrics, not reading accuracy.
+
+The candidate visibly improves previously smeared words such as `and`, `was` and `an`. The control still fails visually. Candidate words such as `taking` and `loyalty` remain imperfect/ambiguous, and custom new-word probes remain malformed. Both owner transcription files are empty, so the candidate's 31/32 plus visual fit gate is not certified. No unseen-word quality, broader-pilot readiness or product readiness is claimed. Retain the candidate for human review; no additional training was launched. See [the comparison result](word-generator-detail-review.md).
 
 ## Position-aware decoder comparison prepared; owner execution pending
 

@@ -7,7 +7,7 @@ import string
 from pathlib import Path
 
 import torch
-from PIL import Image, ImageChops, ImageOps
+from PIL import Image, ImageOps
 from torch import nn
 from torch.nn import functional as F
 from tqdm import tqdm
@@ -17,6 +17,7 @@ from ml.iam import IAMWordDataset
 from ml.utils import environment_info, seed_everything, sha256_file, write_json
 from ml.word_generator_preview import paper_image, save_grid
 from rendering.compositor import punctuation_glyph
+from rendering.print_tiles import compose_print_tiles, select_print_tiles
 
 LETTERS = string.ascii_lowercase
 FORMAT = "inksy-iam-print-glyph-v1"
@@ -279,28 +280,6 @@ def compose_varied_word(word, letters, rng, previous):
     if not word or len(word) > 64 or any(letter not in letters for letter in word):
         raise ValueError("Use 1–64 supported characters per word.")
     return compose_print_tiles(select_print_tiles(word, letters, rng, previous), rng)
-
-
-def select_print_tiles(word, letters, rng, previous):
-    tiles = []
-    for letter in word:
-        choices = letters[letter]
-        index = rng.choice([i for i in range(len(choices)) if i != previous.get(letter)] or [0])
-        previous[letter] = index
-        tiles.append(choices[index])
-    return tiles
-
-
-def compose_print_tiles(tiles, rng):
-    # A small overlap removes duplicated side bearings. Dark strokes survive the overlap.
-    output = Image.new("L", (sum(tile.width for tile in tiles) - len(tiles) + 1, 50), 255)
-    x = 0
-    for tile in tiles:
-        y = rng.randrange(3)
-        bounds = (x, y, x + tile.width, y + tile.height)
-        output.paste(ImageChops.darker(output.crop(bounds), tile), (x, y))
-        x += tile.width - 1
-    return output
 
 
 def punctuation_tile(mark):

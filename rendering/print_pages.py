@@ -5,7 +5,7 @@ import random
 from PIL import Image
 
 from ml.characters import normalize_text
-from ml.print_handwriting import compose_print_tiles, select_print_tiles
+from rendering.print_tiles import compose_print_tiles, select_print_tiles
 
 PAGE_SIZE = (920, 1190)
 MARGIN = 64
